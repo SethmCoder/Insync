@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Isync - Share & Collaborate</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #93c5fd 0%, #3b82f6 100%); }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+        .tutorial-highlight { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .star-rating { cursor: pointer; transition: all 0.2s; }
+        .star-rating:hover { transform: scale(1.2); }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Login Screen -->
+    <div id="loginScreen" class="gradient-bg min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+            <div class="text-center mb-8">
+                <i class="fas fa-lock text-6xl text-indigo-600 mb-4"></i>
+                <h1 class="text-3xl font-bold text-gray-800">Isync</h1>
+                <p class="text-gray-600 mt-2">Share & Collaborate</p>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                    <input type="text" id="loginUsername" placeholder="Enter username" 
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <div class="relative">
+                        <input type="password" id="loginPassword" placeholder="Enter password" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent pr-12">
+                        <button type="button" onclick="togglePasswordVisibility('loginPassword', 'toggleLoginPassword')" 
+                                class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700">
+                            <i id="toggleLoginPassword" class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <button onclick="handleLogin()" 
+                        class="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition duration-200">
+                    Login
+                </button>
+            </div>
+            
+            <div id="loginError" class="mt-4 text-red-600 text-sm hidden"></div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="mainScreen" class="min-h-screen bg-gray-50 hidden">
+        <!-- Top Bar -->
+        <div class="bg-white shadow-md sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-globe text-3xl text-indigo-600"></i>
+                    <h1 class="text-2xl font-bold text-gray-800">Isync</h1>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2 bg-gray-100 px-4 py-2 rounded-lg">
+                        <input type="password" id="displayPassword" value="insync2024" readonly 
+                               class="bg-transparent border-none outline-none text-sm font-mono">
+                        <button onclick="togglePasswordVisibility('displayPassword', 'toggleDisplayPassword')" 
+                                class="text-gray-600 hover:text-gray-800">
+                            <i id="toggleDisplayPassword" class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    
+                    <button onclick="showTutorial()" class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition">
+                        <i class="fas fa-question-circle mr-2"></i> Tutorial
+                    </button>
+                    
+                    <button id="adminBtn" onclick="showAdminPanel()" class="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition hidden">
+                        <i class="fas fa-cog mr-2"></i> Admin
+                    </button>
+                    
+                    <button onclick="handleLogout()" class="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition">
+                        <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Body Content -->
+        <div class="max-w-7xl mx-auto px-4 py-8 space-y-8">
+            <!-- Document Creation Card -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                    <i class="fas fa-plus-circle text-indigo-600 mr-2"></i>Create New Document
+                </h2>
+                
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                            <input type="text" id="docTitle" placeholder="Enter document title" 
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Author</label>
+                            <input type="text" id="docAuthor" placeholder="Enter author name" 
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                        <select id="docCategory" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                            <option value="travel">Travel</option>
+                            <option value="document">Document</option>
+                            <option value="article">Article</option>
+                            <option value="event">Event</option>
+                            <option value="update">Update</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Content</label>
+                        <textarea id="docContent" rows="6" placeholder="Write your content here..." 
+                                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Photos (Optional)</label>
+                        <input type="file" id="docPhotos" multiple accept="image/*" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        <p class="text-xs text-gray-500 mt-1">You can select multiple images</p>
+                    </div>
+                    
+                    <button onclick="createDocument()" 
+                            class="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition">
+                        <i class="fas fa-paper-plane mr-2"></i>Post Document
+                    </button>
+                </div>
+            </div>
+
+            <!-- Document Viewing Card -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                    <i class="fas fa-folder-open text-indigo-600 mr-2"></i>Browse Documents
+                </h2>
+                
+                <div class="mb-6 space-y-4">
+                    <div class="flex flex-col md:flex-row gap-4">
+                        <div class="flex-1">
+                            <input type="text" id="searchInput" placeholder="Search documents..." 
+                                   onkeyup="filterDocuments()"
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div class="md:w-64">
+                            <select id="categoryFilter" onchange="filterDocuments()" 
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                                <option value="">All Categories</option>
+                                <option value="travel">Travel</option>
+                                <option value="document">Document</option>
+                                <option value="article">Article</option>
+                                <option value="event">Event</option>
+                                <option value="update">Update</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="documentsList" class="space-y-4">
+                    <!-- Documents will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="bg-white border-t border-gray-200 mt-12">
+            <div class="max-w-7xl mx-auto px-4 py-4 text-center">
+                <p class="text-gray-600">Version <span id="appVersion">v2.00</span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Panel Modal -->
+    <div id="adminModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-2xl font-bold text-gray-800">
+                        <i class="fas fa-cog text-purple-600 mr-2"></i>Admin Panel
+                    </h2>
+                    <button onclick="closeAdminPanel()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6 space-y-8">
+                <!-- Password Management -->
+                <div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Password Management</h3>
+                    <div class="space-y-4">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">User Password</label>
+                            <div class="flex space-x-2">
+                                <input type="password" id="adminUserPassword" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg">
+                                <button onclick="togglePasswordVisibility('adminUserPassword', 'toggleAdminUserPassword')" 
+                                        class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">
+                                    <i id="toggleAdminUserPassword" class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Admin Password</label>
+                            <div class="flex space-x-2">
+                                <input type="password" id="adminAdminPassword" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg">
+                                <button onclick="togglePasswordVisibility('adminAdminPassword', 'toggleAdminAdminPassword')" 
+                                        class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">
+                                    <i id="toggleAdminAdminPassword" class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button onclick="updatePasswords()" class="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700">
+                            <i class="fas fa-save mr-2"></i>Save Passwords
+                        </button>
+                    </div>
+                </div>
+
+                <!-- User Management -->
+                <div class="border-t border-gray-200 pt-6">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">User Management</h3>
+                    <div class="bg-gray-50 p-4 rounded-lg space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                            <input type="text" id="newUsername" placeholder="Enter username" 
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                            <input type="password" id="newUserPassword" placeholder="Enter password" 
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Access Level</label>
+                            <select id="newUserAccess" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                                <option value="user">Regular User</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                        <button onclick="createNewUser()" class="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700">
+                            <i class="fas fa-user-plus mr-2"></i>Create User
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Existing Users -->
+                <div class="border-t border-gray-200 pt-6">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Existing Users</h3>
+                    <div id="usersList" class="space-y-2">
+                        <!-- Users will be listed here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Document View Modal -->
+    <div id="documentModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <h2 id="modalTitle" class="text-2xl font-bold text-gray-800"></h2>
+                    <button onclick="closeDocumentModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6">
+                <div id="modalContent" class="space-y-6"></div>
+                
+                <div class="border-t border-gray-200 pt-6 mt-6">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Comments & Ratings</h3>
+                    <div id="commentsList" class="space-y-4 mb-6"></div>
+                    
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Your Name</label>
+                            <input type="text" id="commentAuthor" placeholder="Enter your name" 
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Rating</label>
+                            <div class="flex space-x-2" id="starRating">
+                                <i class="fas fa-star text-2xl text-gray-300 star-rating" onclick="setRating(1)"></i>
+                                <i class="fas fa-star text-2xl text-gray-300 star-rating" onclick="setRating(2)"></i>
+                                <i class="fas fa-star text-2xl text-gray-300 star-rating" onclick="setRating(3)"></i>
+                                <i class="fas fa-star text-2xl text-gray-300 star-rating" onclick="setRating(4)"></i>
+                                <i class="fas fa-star text-2xl text-gray-300 star-rating" onclick="setRating(5)"></i>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Comment</label>
+                            <textarea id="commentText" rows="3" placeholder="Write your comment..." 
+                                      class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea>
+                        </div>
+                        <button onclick="submitComment()" class="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700">
+                            <i class="fas fa-comment mr-2"></i>Post Comment
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tutorial Overlay -->
+    <div id="tutorialOverlay" class="fixed inset-0 bg-black bg-opacity-75 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-2xl font-bold text-gray-800">
+                        <i class="fas fa-graduation-cap text-blue-600 mr-2"></i>Welcome to Isync
+                    </h2>
+                    <button onclick="closeTutorial()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6">
+                <div id="tutorialContent" class="space-y-6">
+                    <div class="tutorial-step">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Step 1: Creating a Document</h3>
+                        <p class="text-gray-600">Fill in the title, author, category, and content. You can also upload multiple photos to accompany your document.</p>
+                    </div>
+                    <div class="tutorial-step">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Step 2: Viewing Documents</h3>
+                        <p class="text-gray-600">Browse through all documents, use the search bar to find specific content, or filter by category.</p>
+                    </div>
+                    <div class="tutorial-step">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Step 3: Comments & Ratings</h3>
+                        <p class="text-gray-600">Click on any document to view it in full and leave comments with star ratings to help improve the content.</p>
+                    </div>
+                    <div class="tutorial-step">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Step 4: Admin Features</h3>
+                        <p class="text-gray-600">Admins can manage passwords and create new users. Use the Admin button in the top bar to access these features.</p>
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex justify-between">
+                    <button id="prevTutorialBtn" onclick="prevTutorialStep()" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 hidden">
+                        <i class="fas fa-arrow-left mr-2"></i>Previous
+                    </button>
+                    <button id="nextTutorialBtn" onclick="nextTutorialStep()" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 ml-auto">
+                        Next<i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                    <button id="finishTutorialBtn" onclick="closeTutorial()" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 hidden">
+                        <i class="fas fa-check mr-2"></i>Got it!
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - REPLACE WITH YOUR SUPABASE CREDENTIALS
+        const SUPABASE_URL = 'https://pmvqnhjurcsrktyijkzn.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtdnFuaGp1cmNzcmt0eWlqa3puIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA5MDgzNTgsImV4cCI6MjA3NjQ4NDM1OH0.il1BOQRXrDtVmjCYj42wzsQOfyhDTK20EcGTe94hZlo';
+        
+        // Initialize Supabase client
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Global state
+        let currentUser = null;
+        let currentDocumentId = null;
+        let currentRating = 0;
+        let tutorialStep = 0;
+        
+        // Password visibility toggle
+        function togglePasswordVisibility(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+        
+        // Login handler
+        async function handleLogin() {
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            if (!username || !password) {
+                errorDiv.textContent = 'Please enter both username and password';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+            
+            try {
+                // Check user credentials
+                const { data: users, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('username', username);
+                
+                if (error) throw error;
+                
+                if (users && users.length > 0) {
+                    const user = users[0];
+                    // In production, you should hash and compare passwords
+                    if (user.password === password) {
+                        currentUser = user;
+                        localStorage.setItem('currentUser', JSON.stringify(user));
+                        
+                        // Update last login
+                        await supabase
+                            .from('users')
+                            .update({ last_login: new Date().toISOString() })
+                            .eq('id', user.id);
+                        
+                        // Show main screen
+                        document.getElementById('loginScreen').classList.add('hidden');
+                        document.getElementById('mainScreen').classList.remove('hidden');
+                        
+                        // Show admin button if admin
+                        if (user.access_level === 'admin') {
+                            document.getElementById('adminBtn').classList.remove('hidden');
+                        }
+                        
+                        // Load documents
+                        loadDocuments();
+                    } else {
+                        errorDiv.textContent = 'Invalid password';
+                        errorDiv.classList.remove('hidden');
+                    }
+                } else {
+                    errorDiv.textContent = 'User not found';
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                errorDiv.textContent = 'Login failed. Please try again.';
+                errorDiv.classList.remove('hidden');
+            }
+        }
+        
+        // Logout handler
+        function handleLogout() {
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('mainScreen').classList.add('hidden');
+            document.getElementById('loginUsername').value = '';
+            document.getElementById('loginPassword').value = '';
+        }
+        
+        // Create document
+        async function createDocument() {
+            const title = document.getElementById('docTitle').value;
+            const author = document.getElementById('docAuthor').value;
+            const category = document.getElementById('docCategory').value;
+            const content = document.getElementById('docContent').value;
+            const photosInput = document.getElementById('docPhotos');
+            
+            if (!title || !author || !content) {
+                alert('Please fill in all required fields');
+                return;
+            }
+            
+            try {
+                // Upload photos if any
+                const photoUrls = [];
+                if (photosInput.files.length > 0) {
+                    for (let file of photosInput.files) {
+                        const fileName = `${Date.now()}_${file.name}`;
+                        const { data, error } = await supabase.storage
+                            .from('documents')
+                            .upload(fileName, file);
+                        
+                        if (!error) {
+                            const { data: { publicUrl } } = supabase.storage
+                                .from('documents')
+                                .getPublicUrl(fileName);
+                            photoUrls.push(publicUrl);
+                        }
+                    }
+                }
+                
+                // Create document
+                const { data, error } = await supabase
+                    .from('documents')
+                    .insert([{
+                        title,
+                        author,
+                        category,
+                        content,
+                        photo_urls: photoUrls,
+                        created_at: new Date().toISOString()
+                    }])
+                    .select();
+                
+                if (error) throw error;
+                
+                // Clear form
+                document.getElementById('docTitle').value = '';
+                document.getElementById('docAuthor').value = '';
+                document.getElementById('docContent').value = '';
+                document.getElementById('docPhotos').value = '';
+                
+                alert('Document created successfully!');
+                loadDocuments();
+            } catch (error) {
+                console.error('Error creating document:', error);
+                alert('Failed to create document. Please try again.');
+            }
+        }
+        
+        // Load documents
+        async function loadDocuments() {
+            try {
+                const { data: documents, error } = await supabase
+                    .from('documents')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                
+                displayDocuments(documents || []);
+            } catch (error) {
+                console.error('Error loading documents:', error);
+            }
+        }
+        
+        // Display documents
+        function displayDocuments(documents) {
+            const container = document.getElementById('documentsList');
+            
+            if (documents.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">No documents found. Create your first document above!</p>';
+                return;
+            }
+            
+            container.innerHTML = documents.map(doc => `
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition cursor-pointer" onclick="viewDocument('${doc.id}')">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-lg font-semibold text-gray-800">${escapeHtml(doc.title)}</h3>
+                        <span class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                            ${doc.category}
+                        </span>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-2">By ${escapeHtml(doc.author)}</p>
+                    <p class="text-gray-700">${escapeHtml(doc.content.substring(0, 150))}${doc.content.length > 150 ? '...' : ''}</p>
+                    <p class="text-xs text-gray-500 mt-2">${new Date(doc.created_at).toLocaleDateString()}</p>
+                </div>
+            `).join('');
+        }
+        
+        // Filter documents
+        function filterDocuments() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            
+            // Reload documents and filter client-side
+            loadDocuments().then(() => {
+                const container = document.getElementById('documentsList');
+                const cards = container.children;
+                
+                for (let card of cards) {
+                    const text = card.textContent.toLowerCase();
+                    const category = card.querySelector('.bg-indigo-100').textContent.toLowerCase();
+                    
+                    const matchesSearch = !searchTerm || text.includes(searchTerm);
+                    const matchesCategory = !categoryFilter || category === categoryFilter;
+                    
+                    card.style.display = (matchesSearch && matchesCategory) ? 'block' : 'none';
+                }
+            });
+        }
+        
+        // View document details
+        async function viewDocument(docId) {
+            currentDocumentId = docId;
+            
+            try {
+                const { data: doc, error } = await supabase
+                    .from('documents')
+                    .select('*')
+                    .eq('id', docId)
+                    .single();
+                
+                if (error) throw error;
+                
+                // Display document
+                document.getElementById('modalTitle').textContent = doc.title;
+                const contentDiv = document.getElementById('modalContent');
+                contentDiv.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="flex items-center space-x-4 text-gray-600">
+                            <span><i class="fas fa-user mr-2"></i>${escapeHtml(doc.author)}</span>
+                            <span><i class="fas fa-calendar mr-2"></i>${new Date(doc.created_at).toLocaleDateString()}</span>
+                            <span class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm">
+                                ${doc.category}
+                            </span>
+                        </div>
+                        <div class="text-gray-700 whitespace-pre-wrap">${escapeHtml(doc.content)}</div>
+                        ${doc.photo_urls && doc.photo_urls.length > 0 ? `
+                            <div class="grid grid-cols-2 gap-4">
+                                ${doc.photo_urls.map(url => `
+                                    <img src="${url}" alt="Document photo" class="rounded-lg shadow-md">
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                // Load comments
+                await loadComments(docId);
+                
+                // Show modal
+                document.getElementById('documentModal').classList.remove('hidden');
+            } catch (error) {
+                console.error('Error loading document:', error);
+                alert('Failed to load document');
+            }
+        }
+        
+        // Load comments
+        async function loadComments(docId) {
+            try {
+                const { data: comments, error } = await supabase
+                    .from('comments')
+                    .select('*')
+                    .eq('document_id', docId)
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                
+                const commentsList = document.getElementById('commentsList');
+                
+                if (!comments || comments.length === 0) {
+                    commentsList.innerHTML = '<p class="text-gray-500 text-center py-4">No comments yet. Be the first to comment!</p>';
+                    return;
+                }
+                
+                commentsList.innerHTML = comments.map(comment => `
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="font-semibold text-gray-800">${escapeHtml(comment.author)}</h4>
+                            <div class="flex text-yellow-400">
+                                ${'★'.repeat(comment.stars)}${'☆'.repeat(5 - comment.stars)}
+                            </div>
+                        </div>
+                        <p class="text-gray-700">${escapeHtml(comment.text)}</p>
+                        <p class="text-xs text-gray-500 mt-2">${new Date(comment.created_at).toLocaleDateString()}</p>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading comments:', error);
+            }
+        }
+        
+        // Set star rating
+        function setRating(rating) {
+            currentRating = rating;
+            const stars = document.querySelectorAll('#starRating i');
+            stars.forEach((star, index) => {
+                if (index < rating) {
+                    star.classList.add('text-yellow-400');
+                    star.classList.remove('text-gray-300');
+                } else {
+                    star.classList.remove('text-yellow-400');
+                    star.classList.add('text-gray-300');
+                }
+            });
+        }
+        
+        // Submit comment
+        async function submitComment() {
+            const author = document.getElementById('commentAuthor').value;
+            const text = document.getElementById('commentText').value;
+            
+            if (!author || !text) {
+                alert('Please enter your name and comment');
+                return;
+            }
+            
+            if (currentRating === 0) {
+                alert('Please provide a rating');
+                return;
+            }
+            
+            try {
+                const { error } = await supabase
+                    .from('comments')
+                    .insert([{
+                        document_id: currentDocumentId,
+                        author,
+                        text,
+                        stars: currentRating,
+                        created_at: new Date().toISOString()
+                    }]);
+                
+                if (error) throw error;
+                
+                // Clear form
+                document.getElementById('commentAuthor').value = '';
+                document.getElementById('commentText').value = '';
+                currentRating = 0;
+                setRating(0);
+                
+                // Reload comments
+                await loadComments(currentDocumentId);
+            } catch (error) {
+                console.error('Error submitting comment:', error);
+                alert('Failed to submit comment');
+            }
+        }
+        
+        // Close document modal
+        function closeDocumentModal() {
+            document.getElementById('documentModal').classList.add('hidden');
+            currentDocumentId = null;
+        }
+        
+        // Show admin panel
+        async function showAdminPanel() {
+            if (!currentUser || currentUser.access_level !== 'admin') {
+                alert('Admin access required');
+                return;
+            }
+            
+            // Load current passwords
+            try {
+                const { data: settings, error } = await supabase
+                    .from('app_settings')
+                    .select('*')
+                    .single();
+                
+                if (!error && settings) {
+                    document.getElementById('adminUserPassword').value = settings.user_password || 'insync2024';
+                    document.getElementById('adminAdminPassword').value = settings.admin_password || 'insync202245';
+                }
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+            
+            // Load users
+            await loadUsers();
+            
+            document.getElementById('adminModal').classList.remove('hidden');
+        }
+        
+        // Close admin panel
+        function closeAdminPanel() {
+            document.getElementById('adminModal').classList.add('hidden');
+        }
+        
+        // Update passwords
+        async function updatePasswords() {
+            const userPassword = document.getElementById('adminUserPassword').value;
+            const adminPassword = document.getElementById('adminAdminPassword').value;
+            
+            if (!userPassword || !adminPassword) {
+                alert('Please enter both passwords');
+                return;
+            }
+            
+            try {
+                const { error } = await supabase
+                    .from('app_settings')
+                    .upsert({
+                        id: 1,
+                        user_password: userPassword,
+                        admin_password: adminPassword,
+                        version: 'v2.00',
+                        updated_at: new Date().toISOString()
+                    });
+                
+                if (error) throw error;
+                
+                alert('Passwords updated successfully!');
+            } catch (error) {
+                console.error('Error updating passwords:', error);
+                alert('Failed to update passwords');
+            }
+        }
+        
+        // Create new user
+        async function createNewUser() {
+            const username = document.getElementById('newUsername').value;
+            const password = document.getElementById('newUserPassword').value;
+            const accessLevel = document.getElementById('newUserAccess').value;
+            
+            if (!username || !password) {
+                alert('Please enter username and password');
+                return;
+            }
+            
+            try {
+                const { error } = await supabase
+                    .from('users')
+                    .insert([{
+                        username,
+                        password,
+                        access_level: accessLevel,
+                        created_at: new Date().toISOString()
+                    }]);
+                
+                if (error) throw error;
+                
+                // Clear form
+                document.getElementById('newUsername').value = '';
+                document.getElementById('newUserPassword').value = '';
+                
+                alert('User created successfully!');
+                await loadUsers();
+            } catch (error) {
+                console.error('Error creating user:', error);
+                alert('Failed to create user');
+            }
+        }
+        
+        // Load users
+        async function loadUsers() {
+            try {
+                const { data: users, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                
+                const usersList = document.getElementById('usersList');
+                usersList.innerHTML = (users || []).map(user => `
+                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <span class="font-semibold">${escapeHtml(user.username)}</span>
+                            <span class="ml-2 px-2 py-1 text-xs rounded ${user.access_level === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">
+                                ${user.access_level}
+                            </span>
+                        </div>
+                        <button onclick="deleteUser('${user.id}')" class="text-red-600 hover:text-red-800">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+        
+        // Delete user
+        async function deleteUser(userId) {
+            if (!confirm('Are you sure you want to delete this user?')) return;
+            
+            try {
+                const { error } = await supabase
+                    .from('users')
+                    .delete()
+                    .eq('id', userId);
+                
+                if (error) throw error;
+                
+                alert('User deleted successfully');
+                await loadUsers();
+            } catch (error) {
+                console.error('Error deleting user:', error);
+                alert('Failed to delete user');
+            }
+        }
+        
+        // Tutorial functions
+        function showTutorial() {
+            tutorialStep = 0;
+            updateTutorialDisplay();
+            document.getElementById('tutorialOverlay').classList.remove('hidden');
+        }
+        
+        function closeTutorial() {
+            document.getElementById('tutorialOverlay').classList.add('hidden');
+        }
+        
+        function nextTutorialStep() {
+            tutorialStep++;
+            updateTutorialDisplay();
+        }
+        
+        function prevTutorialStep() {
+            tutorialStep--;
+            updateTutorialDisplay();
+        }
+        
+        function updateTutorialDisplay() {
+            const steps = document.querySelectorAll('.tutorial-step');
+            const prevBtn = document.getElementById('prevTutorialBtn');
+            const nextBtn = document.getElementById('nextTutorialBtn');
+            const finishBtn = document.getElementById('finishTutorialBtn');
+            
+            steps.forEach((step, index) => {
+                step.style.display = index === tutorialStep ? 'block' : 'none';
+            });
+            
+            prevBtn.classList.toggle('hidden', tutorialStep === 0);
+            nextBtn.classList.toggle('hidden', tutorialStep === steps.length - 1);
+            finishBtn.classList.toggle('hidden', tutorialStep !== steps.length - 1);
+        }
+        
+        // Utility function to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Initialize app
+        window.addEventListener('DOMContentLoaded', async () => {
+            // Check if user is already logged in
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('mainScreen').classList.remove('hidden');
+                
+                if (currentUser.access_level === 'admin') {
+                    document.getElementById('adminBtn').classList.remove('hidden');
+                }
+                
+                loadDocuments();
+            }
+            
+            // Check if first time user
+            const hasSeenTutorial = localStorage.getItem('hasSeenTutorial');
+            if (!hasSeenTutorial && !savedUser) {
+                setTimeout(() => {
+                    showTutorial();
+                    localStorage.setItem('hasSeenTutorial', 'true');
+                }, 1000);
+            }
+        });
+    </script>
+</body>
+</html>
+
