@@ -1,6 +1,6 @@
-# Isync Quick Start Guide
+# Insync Quick Start Guide
 
-Get your Isync application running in 5 minutes! ⚡
+Get your Insync application running in 5 minutes! ⚡
 
 ## Step 1: Create Supabase Project (2 minutes)
 
@@ -157,5 +157,5 @@ Get your Isync application running in 5 minutes! ⚡
 
 **You're all set!** 🚀
 
-Enjoy sharing and collaborating with Isync!
+Enjoy sharing and collaborating with Insync!
 

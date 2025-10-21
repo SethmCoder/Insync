@@ -1,6 +1,6 @@
-# Deployment Guide for Isync
+# Deployment Guide for Insync
 
-This guide covers deploying your Isync application to various platforms.
+This guide covers deploying your Insync application to various platforms.
 
 ## Prerequisites
 

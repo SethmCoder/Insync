@@ -1,4 +1,4 @@
--- Isync Database Setup Script
+-- Insync Database Setup Script
 -- Run this in your Supabase SQL Editor
 
 -- Drop existing tables if they exist (for clean setup)
@@ -69,7 +69,7 @@ INSERT INTO app_settings (user_password, admin_password, version) VALUES
 
 -- Create sample documents
 INSERT INTO documents (title, author, content, category) VALUES
-  ('Welcome to Isync!', 'Admin', 'This is your personal space to share updates, travel stories, and collaborate on documents with friends. Start by creating your first document or browse what others have shared!', 'update'),
+  ('Welcome to Insync!', 'Admin', 'This is your personal space to share updates, travel stories, and collaborate on documents with friends. Start by creating your first document or browse what others have shared!', 'update'),
   ('Summer Travel Plans', 'Admin', 'Planning a trip to Europe this summer. Looking for recommendations on must-visit places in Paris and Rome. Any suggestions would be appreciated!', 'travel'),
   ('Project Collaboration Guidelines', 'Admin', 'Here are some guidelines for our collaborative documents: 1) Be respectful in comments, 2) Use constructive feedback, 3) Rate honestly, 4) Share your thoughts freely!', 'document'),
   ('Weekend Hiking Event', 'Admin', 'Join us this Saturday for a morning hike at the local nature reserve! We''ll meet at the parking lot at 8 AM. Bring water, snacks, and good hiking shoes. See you there!', 'event'),
