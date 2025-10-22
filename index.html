@@ -607,7 +607,12 @@
         
         // View document details
         async function viewDocument(docId) {
+            // Reset form and set current document
             currentDocumentId = docId;
+            currentRating = 0;
+            setRating(0);
+            document.getElementById('commentAuthor').value = '';
+            document.getElementById('commentText').value = '';
             
             try {
                 const { data: doc, error } = await supabase
@@ -738,7 +743,14 @@
                 return;
             }
             
+            if (!currentDocumentId) {
+                alert('Error: No document selected. Please close and reopen the document.');
+                return;
+            }
+            
             try {
+                console.log('Submitting comment for document:', currentDocumentId);
+                
                 const { error } = await supabase
                     .from('comments')
                     .insert([{
@@ -757,18 +769,23 @@
                 currentRating = 0;
                 setRating(0);
                 
-                // Reload comments
+                // Reload comments for the current document
                 await loadComments(currentDocumentId);
+                
+                // Also reload the main document list to update average ratings
+                await loadDocuments();
+                
+                alert('Comment posted successfully!');
             } catch (error) {
                 console.error('Error submitting comment:', error);
-                alert('Failed to submit comment');
+                alert('Failed to submit comment. Please try again.');
             }
         }
         
         // Close document modal
         function closeDocumentModal() {
             document.getElementById('documentModal').classList.add('hidden');
-            currentDocumentId = null;
+            // Don't reset currentDocumentId here - keep it for potential comment submission
         }
         
         // Show admin panel
