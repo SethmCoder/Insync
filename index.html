@@ -538,14 +538,14 @@
                 
                 if (error) throw error;
                 
-                displayDocuments(documents || []);
+                await displayDocuments(documents || []);
             } catch (error) {
                 console.error('Error loading documents:', error);
             }
         }
         
         // Display documents
-        function displayDocuments(documents) {
+        async function displayDocuments(documents) {
             const container = document.getElementById('documentsList');
             
             if (documents.length === 0) {
@@ -553,13 +553,29 @@
                 return;
             }
             
-            container.innerHTML = documents.map(doc => `
+            // Get average ratings for all documents
+            const documentsWithRatings = await Promise.all(documents.map(async (doc) => {
+                const avgRating = await getAverageRating(doc.id);
+                return { ...doc, avgRating };
+            }));
+            
+            container.innerHTML = documentsWithRatings.map(doc => `
                 <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition cursor-pointer" onclick="viewDocument('${doc.id}')">
                     <div class="flex justify-between items-start mb-2">
                         <h3 class="text-lg font-semibold text-gray-800">${escapeHtml(doc.title)}</h3>
-                        <span class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
-                            ${doc.category}
-                        </span>
+                        <div class="flex items-center space-x-2">
+                            ${doc.avgRating > 0 ? `
+                                <div class="flex items-center">
+                                    <div class="flex text-yellow-400 text-sm">
+                                        ${'★'.repeat(Math.round(doc.avgRating))}${'☆'.repeat(5 - Math.round(doc.avgRating))}
+                                    </div>
+                                    <span class="text-xs text-gray-500 ml-1">(${doc.avgRating.toFixed(1)})</span>
+                                </div>
+                            ` : ''}
+                            <span class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+                                ${doc.category}
+                            </span>
+                        </div>
                     </div>
                     <p class="text-sm text-gray-600 mb-2">By ${escapeHtml(doc.author)}</p>
                     <p class="text-gray-700">${escapeHtml(doc.content.substring(0, 150))}${doc.content.length > 150 ? '...' : ''}</p>
@@ -569,25 +585,24 @@
         }
         
         // Filter documents
-        function filterDocuments() {
+        async function filterDocuments() {
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             const categoryFilter = document.getElementById('categoryFilter').value;
             
             // Reload documents and filter client-side
-            loadDocuments().then(() => {
-                const container = document.getElementById('documentsList');
-                const cards = container.children;
+            await loadDocuments();
+            const container = document.getElementById('documentsList');
+            const cards = container.children;
+            
+            for (let card of cards) {
+                const text = card.textContent.toLowerCase();
+                const category = card.querySelector('.bg-indigo-100').textContent.toLowerCase();
                 
-                for (let card of cards) {
-                    const text = card.textContent.toLowerCase();
-                    const category = card.querySelector('.bg-indigo-100').textContent.toLowerCase();
-                    
-                    const matchesSearch = !searchTerm || text.includes(searchTerm);
-                    const matchesCategory = !categoryFilter || category === categoryFilter;
-                    
-                    card.style.display = (matchesSearch && matchesCategory) ? 'block' : 'none';
-                }
-            });
+                const matchesSearch = !searchTerm || text.includes(searchTerm);
+                const matchesCategory = !categoryFilter || category === categoryFilter;
+                
+                card.style.display = (matchesSearch && matchesCategory) ? 'block' : 'none';
+            }
         }
         
         // View document details
@@ -634,6 +649,27 @@
             } catch (error) {
                 console.error('Error loading document:', error);
                 alert('Failed to load document');
+            }
+        }
+        
+        // Get average rating for a document
+        async function getAverageRating(docId) {
+            try {
+                const { data: comments, error } = await supabase
+                    .from('comments')
+                    .select('stars')
+                    .eq('document_id', docId);
+                
+                if (error || !comments || comments.length === 0) {
+                    return 0;
+                }
+                
+                const totalStars = comments.reduce((sum, comment) => sum + comment.stars, 0);
+                const averageRating = totalStars / comments.length;
+                return averageRating;
+            } catch (error) {
+                console.error('Error calculating average rating:', error);
+                return 0;
             }
         }
         
