@@ -18,7 +18,7 @@
         .star-rating:hover { transform: scale(1.2); }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-gradient-to-br from-[#00a6ff] to-[#0000ff]">
     <!-- Login Screen -->
     <div id="loginScreen" class="gradient-bg min-h-screen flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
@@ -138,7 +138,7 @@
                         <p class="text-xs text-gray-500 mt-1">You can select multiple images</p>
                     </div>
                     
-                    <button onclick="createDocument()" 
+                    <button id="createDocButton" type="button" onclick="createDocument()" 
                             class="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition">
                         <i class="fas fa-paper-plane mr-2"></i>Post Document
                     </button>
@@ -468,7 +468,13 @@
         }
         
         // Create document
+        let isCreatingDocument = false;
         async function createDocument() {
+            // Prevent multiple simultaneous submissions
+            if (isCreatingDocument) {
+                return;
+            }
+            
             const title = document.getElementById('docTitle').value;
             const author = document.getElementById('docAuthor').value;
             const category = document.getElementById('docCategory').value;
@@ -479,6 +485,13 @@
                 alert('Please fill in all required fields');
                 return;
             }
+            
+            // Disable button and set flag
+            isCreatingDocument = true;
+            const button = document.getElementById('createDocButton');
+            const originalButtonText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating...';
             
             try {
                 // Upload photos if any
@@ -525,6 +538,11 @@
             } catch (error) {
                 console.error('Error creating document:', error);
                 alert('Failed to create document. Please try again.');
+            } finally {
+                // Re-enable button and reset flag
+                isCreatingDocument = false;
+                button.disabled = false;
+                button.innerHTML = originalButtonText;
             }
         }
         
