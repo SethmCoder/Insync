@@ -497,23 +497,38 @@
                 // Upload photos if any
                 const photoUrls = [];
                 if (photosInput.files.length > 0) {
-                    for (let file of photosInput.files) {
-                        const fileName = `${Date.now()}_${file.name}`;
-                        const { data, error } = await supabase.storage
-                            .from('documents')
-                            .upload(fileName, file);
-                        
-                        if (!error) {
-                            const { data: { publicUrl } } = supabase.storage
+                    // Upload all photos in parallel for better performance
+                    const uploadPromises = Array.from(photosInput.files).map(async (file, index) => {
+                        // Use index and timestamp to ensure unique filenames
+                        const fileName = `${Date.now()}_${index}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+                        try {
+                            const { data, error } = await supabase.storage
                                 .from('documents')
-                                .getPublicUrl(fileName);
-                            photoUrls.push(publicUrl);
+                                .upload(fileName, file);
+                            
+                            if (!error) {
+                                const { data: { publicUrl } } = supabase.storage
+                                    .from('documents')
+                                    .getPublicUrl(fileName);
+                                return publicUrl;
+                            } else {
+                                console.error('Error uploading file:', file.name, error);
+                                return null;
+                            }
+                        } catch (err) {
+                            console.error('Error uploading file:', file.name, err);
+                            return null;
                         }
-                    }
+                    });
+                    
+                    // Wait for all uploads to complete
+                    const results = await Promise.all(uploadPromises);
+                    // Filter out any null results (failed uploads)
+                    photoUrls.push(...results.filter(url => url !== null));
                 }
                 
                 // Create document
-                const { data, error } = await supabase
+                const { data: newDoc, error } = await supabase
                     .from('documents')
                     .insert([{
                         title,
@@ -533,8 +548,17 @@
                 document.getElementById('docContent').value = '';
                 document.getElementById('docPhotos').value = '';
                 
+                // Clear any active filters to ensure new document is visible
+                document.getElementById('searchInput').value = '';
+                document.getElementById('categoryFilter').value = '';
+                
+                // Reload documents immediately to show the new document
+                await loadDocuments();
+                
+                // Scroll to the document viewing area to show the new document
+                document.getElementById('documentsList').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
                 alert('Document created successfully!');
-                loadDocuments();
             } catch (error) {
                 console.error('Error creating document:', error);
                 alert('Failed to create document. Please try again.');
