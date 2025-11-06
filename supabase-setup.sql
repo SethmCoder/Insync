@@ -52,6 +52,28 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('documents', 'documents', true)
 ON CONFLICT (id) DO NOTHING;
 
+-- Storage policies for the documents bucket
+-- Allow anyone to read/download files
+CREATE POLICY "Public Access for documents bucket" ON storage.objects
+FOR SELECT
+USING (bucket_id = 'documents');
+
+-- Allow anyone to upload files
+CREATE POLICY "Public Upload for documents bucket" ON storage.objects
+FOR INSERT
+WITH CHECK (bucket_id = 'documents');
+
+-- Allow anyone to update files
+CREATE POLICY "Public Update for documents bucket" ON storage.objects
+FOR UPDATE
+USING (bucket_id = 'documents')
+WITH CHECK (bucket_id = 'documents');
+
+-- Allow anyone to delete files
+CREATE POLICY "Public Delete for documents bucket" ON storage.objects
+FOR DELETE
+USING (bucket_id = 'documents');
+
 -- Create initial admin users
 INSERT INTO users (username, password, access_level) VALUES 
   ('admin1', 'insync2024', 'admin'),

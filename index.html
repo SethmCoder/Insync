@@ -500,26 +500,61 @@
                 // Upload photos if any
                 const photoUrls = [];
                 if (photosInput.files.length > 0) {
+                    console.log(`Starting upload of ${photosInput.files.length} photos...`);
+                    button.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i>Uploading ${photosInput.files.length} photos...`;
+                    
                     // Upload all photos in parallel for better performance
+                    const baseTimestamp = Date.now();
                     const uploadPromises = Array.from(photosInput.files).map(async (file, index) => {
-                        // Use index and timestamp to ensure unique filenames
-                        const fileName = `${Date.now()}_${index}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+                        // Use base timestamp + index + random to ensure unique filenames
+                        const uniqueId = `${baseTimestamp}_${index}_${Math.random().toString(36).substring(2, 9)}`;
+                        const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+                        const fileName = `${uniqueId}_${sanitizedName}`;
+                        
                         try {
-                            const { data, error } = await supabase.storage
-                                .from('documents')
-                                .upload(fileName, file);
+                            console.log(`Uploading photo ${index + 1}/${photosInput.files.length}: ${file.name}`);
                             
-                            if (!error) {
-                                const { data: { publicUrl } } = supabase.storage
-                                    .from('documents')
-                                    .getPublicUrl(fileName);
-                                return publicUrl;
-                            } else {
-                                console.error('Error uploading file:', file.name, error);
+                            const { data: uploadData, error: uploadError } = await supabase.storage
+                                .from('documents')
+                                .upload(fileName, file, {
+                                    cacheControl: '3600',
+                                    upsert: false
+                                });
+                            
+                            if (uploadError) {
+                                console.error(`Error uploading file ${file.name}:`, uploadError);
+                                // Check if it's a duplicate file error
+                                if (uploadError.message && uploadError.message.includes('already exists')) {
+                                    console.warn(`File ${fileName} already exists, trying alternative name`);
+                                    // Try with a different name
+                                    const altFileName = `${baseTimestamp}_${index}_alt_${Math.random().toString(36).substring(2, 9)}_${sanitizedName}`;
+                                    const { data: altData, error: altError } = await supabase.storage
+                                        .from('documents')
+                                        .upload(altFileName, file, {
+                                            cacheControl: '3600',
+                                            upsert: false
+                                        });
+                                    
+                                    if (!altError) {
+                                        const { data: { publicUrl } } = supabase.storage
+                                            .from('documents')
+                                            .getPublicUrl(altFileName);
+                                        console.log(`Successfully uploaded ${file.name} with alternative name`);
+                                        return publicUrl;
+                                    }
+                                }
                                 return null;
                             }
+                            
+                            // Get public URL
+                            const { data: { publicUrl } } = supabase.storage
+                                .from('documents')
+                                .getPublicUrl(fileName);
+                            
+                            console.log(`Successfully uploaded ${file.name}: ${publicUrl}`);
+                            return publicUrl;
                         } catch (err) {
-                            console.error('Error uploading file:', file.name, err);
+                            console.error(`Exception uploading file ${file.name}:`, err);
                             return null;
                         }
                     });
@@ -527,23 +562,48 @@
                     // Wait for all uploads to complete
                     const results = await Promise.all(uploadPromises);
                     // Filter out any null results (failed uploads)
-                    photoUrls.push(...results.filter(url => url !== null));
+                    const successfulUploads = results.filter(url => url !== null);
+                    photoUrls.push(...successfulUploads);
+                    
+                    console.log(`Upload complete: ${successfulUploads.length}/${photosInput.files.length} photos uploaded successfully`);
+                    
+                    if (successfulUploads.length < photosInput.files.length) {
+                        const failedCount = photosInput.files.length - successfulUploads.length;
+                        console.warn(`${failedCount} photo(s) failed to upload`);
+                        alert(`Warning: ${failedCount} out of ${photosInput.files.length} photos failed to upload. The document will be created with ${successfulUploads.length} photo(s).`);
+                    }
                 }
                 
                 // Create document
+                console.log(`Creating document with ${photoUrls.length} photo(s)`);
+                console.log('Photo URLs:', photoUrls);
+                
+                const documentData = {
+                    title,
+                    author,
+                    category,
+                    content,
+                    photo_urls: photoUrls.length > 0 ? photoUrls : null,
+                    created_at: new Date().toISOString()
+                };
+                
+                console.log('Document data to insert:', documentData);
+                
                 const { data: newDoc, error } = await supabase
                     .from('documents')
-                    .insert([{
-                        title,
-                        author,
-                        category,
-                        content,
-                        photo_urls: photoUrls,
-                        created_at: new Date().toISOString()
-                    }])
+                    .insert([documentData])
                     .select();
                 
-                if (error) throw error;
+                if (error) {
+                    console.error('Error creating document:', error);
+                    throw error;
+                }
+                
+                console.log('Document created successfully:', newDoc);
+                if (newDoc && newDoc[0]) {
+                    console.log('Document photo_urls:', newDoc[0].photo_urls);
+                    console.log('Photo URLs count:', newDoc[0].photo_urls ? newDoc[0].photo_urls.length : 0);
+                }
                 
                 // Clear form
                 document.getElementById('docTitle').value = '';
@@ -606,14 +666,31 @@
             }));
             
             container.innerHTML = documentsWithRatings.map(doc => {
-                const hasPhotos = doc.photo_urls && Array.isArray(doc.photo_urls) && doc.photo_urls.length > 0;
+                // Handle photo_urls - it might be a string, array, or null
+                let photoUrls = [];
+                if (doc.photo_urls) {
+                    if (Array.isArray(doc.photo_urls)) {
+                        photoUrls = doc.photo_urls;
+                    } else if (typeof doc.photo_urls === 'string') {
+                        try {
+                            photoUrls = JSON.parse(doc.photo_urls);
+                            if (!Array.isArray(photoUrls)) {
+                                photoUrls = [doc.photo_urls];
+                            }
+                        } catch (e) {
+                            photoUrls = [doc.photo_urls];
+                        }
+                    }
+                }
+                const hasPhotos = photoUrls.length > 0;
+                const photoCount = photoUrls.length;
                 return `
                 <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition cursor-pointer" onclick="viewDocument('${doc.id}')">
                     <div class="flex justify-between items-start mb-2">
                         <div class="flex items-center space-x-2 flex-1">
                             <h3 class="text-lg font-semibold text-gray-800">${escapeHtml(doc.title)}</h3>
                             ${hasPhotos ? `
-                                <i class="fas fa-image text-indigo-600 text-sm" title="This document has ${doc.photo_urls.length} photo(s)"></i>
+                                <i class="fas fa-image text-indigo-600 text-sm" title="This document has ${photoCount} photo(s)"></i>
                             ` : ''}
                         </div>
                         <div class="flex items-center space-x-2">
@@ -677,9 +754,38 @@
                 
                 if (error) throw error;
                 
+                console.log('Document loaded:', doc);
+                console.log('Photo URLs:', doc.photo_urls);
+                console.log('Photo URLs type:', typeof doc.photo_urls);
+                console.log('Photo URLs is array:', Array.isArray(doc.photo_urls));
+                if (doc.photo_urls) {
+                    console.log('Photo URLs length:', doc.photo_urls.length);
+                }
+                
                 // Display document
                 document.getElementById('modalTitle').textContent = doc.title;
                 const contentDiv = document.getElementById('modalContent');
+                
+                // Handle photo_urls - it might be a string, array, or null
+                let photoUrls = [];
+                if (doc.photo_urls) {
+                    if (Array.isArray(doc.photo_urls)) {
+                        photoUrls = doc.photo_urls;
+                    } else if (typeof doc.photo_urls === 'string') {
+                        // Try to parse if it's a JSON string
+                        try {
+                            photoUrls = JSON.parse(doc.photo_urls);
+                            if (!Array.isArray(photoUrls)) {
+                                photoUrls = [doc.photo_urls]; // Fallback to single string
+                            }
+                        } catch (e) {
+                            photoUrls = [doc.photo_urls]; // Single URL string
+                        }
+                    }
+                }
+                
+                console.log('Processed photo URLs for display:', photoUrls);
+                
                 contentDiv.innerHTML = `
                     <div class="space-y-6">
                         <div class="flex items-center space-x-4 text-gray-600">
@@ -688,29 +794,33 @@
                             <span class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm">
                                 ${doc.category}
                             </span>
-                            ${doc.photo_urls && doc.photo_urls.length > 0 ? `
+                            ${photoUrls.length > 0 ? `
                                 <span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
-                                    <i class="fas fa-image mr-1"></i>${doc.photo_urls.length} photo(s)
+                                    <i class="fas fa-image mr-1"></i>${photoUrls.length} photo(s)
                                 </span>
                             ` : ''}
                         </div>
                         <div class="text-gray-700 whitespace-pre-wrap text-base leading-relaxed">${escapeHtml(doc.content)}</div>
-                        ${doc.photo_urls && doc.photo_urls.length > 0 ? `
+                        ${photoUrls.length > 0 ? `
                             <div class="border-t border-gray-200 pt-4">
                                 <h4 class="text-lg font-semibold text-gray-800 mb-4">
                                     <i class="fas fa-images mr-2 text-indigo-600"></i>Photos
                                 </h4>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    ${doc.photo_urls.map((url, index) => `
+                                    ${photoUrls.map((url, index) => {
+                                        if (!url) return '';
+                                        return `
                                         <div class="relative">
                                             <img src="${url}" alt="Document photo ${index + 1}" 
                                                  class="rounded-lg shadow-md w-full h-auto cursor-pointer hover:shadow-lg transition"
+                                                 onerror="console.error('Failed to load image:', '${url}'); this.style.display='none';"
                                                  onclick="window.open('${url}', '_blank')">
                                         </div>
-                                    `).join('')}
+                                    `;
+                                    }).join('')}
                                 </div>
                             </div>
-                        ` : ''}
+                        ` : '<p class="text-gray-500 text-sm italic">No photos attached to this document.</p>'}
                     </div>
                 `;
                 
