@@ -19,9 +19,16 @@ CREATE TABLE IF NOT EXISTS documents (
   author TEXT NOT NULL,
   content TEXT NOT NULL,
   category TEXT NOT NULL,
+  location_name TEXT,
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
   photo_urls TEXT[],
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS location_name TEXT;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
 
 -- Create comments table (only if it doesn't exist)
 CREATE TABLE IF NOT EXISTS comments (

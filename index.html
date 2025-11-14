@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
@@ -16,6 +17,12 @@
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .star-rating { cursor: pointer; transition: all 0.2s; }
         .star-rating:hover { transform: scale(1.2); }
+        .map-container { height: 350px; border-radius: 0.75rem; overflow: hidden; position: relative; background-color: #f8fafc; z-index: 1; }
+        #documentLocationPicker, #documentsMap { height: 350px; width: 100%; }
+        .map-instruction { font-size: 0.75rem; color: #4b5563; }
+        #documentModal { z-index: 9999 !important; }
+        #documentModal .leaflet-container { z-index: 0 !important; }
+        .leaflet-popup { z-index: 5000 !important; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-[#00a6ff] to-[#0000ff]">
@@ -140,6 +147,36 @@
                             <p id="selectedFilesCount" class="text-xs text-indigo-600 mt-1 hidden"></p>
                         </div>
                     </div>
+
+                    <div class="space-y-3">
+                        <label class="block text-sm font-medium text-gray-700">Location (Optional)</label>
+                        <p class="map-instruction">Click anywhere on the map to drop a document pin, or enter coordinates manually. Leave blank to skip.</p>
+                        <input type="text" id="docLocationName" placeholder="Enter location name or description"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <div class="map-container border border-gray-200">
+                            <div id="documentLocationPicker"></div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Latitude</label>
+                                <input type="text" id="docLatitude" readonly
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm"
+                                       placeholder="Click on the map">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Longitude</label>
+                                <input type="text" id="docLongitude" readonly
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm"
+                                       placeholder="Click on the map">
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between flex-wrap gap-3">
+                            <p id="docLocationStatus" class="text-xs text-gray-500">No location selected.</p>
+                            <button type="button" id="docLocationClearBtn" class="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm">
+                                <i class="fas fa-times mr-1"></i>Clear Location
+                            </button>
+                        </div>
+                    </div>
                     
                     <button id="createDocButton" type="button" onclick="createDocument()" 
                             class="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition">
@@ -150,9 +187,15 @@
 
             <!-- Document Viewing Card -->
             <div class="bg-white rounded-xl shadow-lg p-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6">
-                    <i class="fas fa-folder-open text-indigo-600 mr-2"></i>Browse Documents
-                </h2>
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">
+                        <i class="fas fa-folder-open text-indigo-600 mr-2"></i>Browse Documents
+                    </h2>
+                    <button onclick="loadDocuments()" class="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition flex items-center space-x-2">
+                        <i class="fas fa-sync-alt"></i>
+                        <span>Refresh</span>
+                    </button>
+                </div>
                 
                 <div class="mb-6 space-y-4">
                     <div class="flex flex-col md:flex-row gap-4">
@@ -177,6 +220,23 @@
                 
                 <div id="documentsList" class="space-y-4">
                     <!-- Documents will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Document Map Card -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">
+                        <i class="fas fa-map-marker-alt text-green-500 mr-2"></i>Document Map
+                    </h2>
+                    <button onclick="refreshDocumentMap()" class="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition flex items-center space-x-2">
+                        <i class="fas fa-map"></i>
+                        <span>Reset View</span>
+                    </button>
+                </div>
+                <p class="map-instruction mb-3">Documents with saved locations appear on the map below. Click a pin to open the document. Use two fingers or your mouse to zoom and pan.</p>
+                <div class="map-container border border-gray-200">
+                    <div id="documentsMap"></div>
                 </div>
             </div>
         </div>
@@ -263,7 +323,13 @@
 
                 <!-- Existing Users -->
                 <div class="border-t border-gray-200 pt-6">
-                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Existing Users</h3>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-gray-800">Existing Users</h3>
+                        <button onclick="loadUsers()" class="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition flex items-center space-x-2">
+                            <i class="fas fa-sync-alt"></i>
+                            <span>Refresh Users</span>
+                        </button>
+                    </div>
                     <div id="usersList" class="space-y-2">
                         <!-- Users will be listed here -->
                     </div>
@@ -369,6 +435,7 @@
             </div>
         </div>
     </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
     <script>
         // Configuration - REPLACE WITH YOUR SUPABASE CREDENTIALS
@@ -383,6 +450,13 @@
         let currentDocumentId = null;
         let currentRating = 0;
         let tutorialStep = 0;
+        let allDocuments = [];
+        let documentMap = null;
+        let creationMap = null;
+        let documentMarkers = [];
+        let creationMarker = null;
+        let mapsInitialized = false;
+        let selectedLocation = null;
         
         // Password visibility toggle
         function togglePasswordVisibility(inputId, iconId) {
@@ -443,6 +517,8 @@
                             document.getElementById('adminBtn').classList.remove('hidden');
                         }
                         
+                        initializeMaps();
+                        
                         // Load documents
                         loadDocuments();
                     } else {
@@ -468,6 +544,7 @@
             document.getElementById('mainScreen').classList.add('hidden');
             document.getElementById('loginUsername').value = '';
             document.getElementById('loginPassword').value = '';
+            clearDocumentLocation();
         }
         
         // Create document
@@ -483,6 +560,13 @@
             const category = document.getElementById('docCategory').value;
             const content = document.getElementById('docContent').value;
             const photosInput = document.getElementById('docPhotos');
+            const locationNameValue = document.getElementById('docLocationName').value.trim();
+            const latitudeValue = document.getElementById('docLatitude').value;
+            const longitudeValue = document.getElementById('docLongitude').value;
+            const latitude = latitudeValue ? parseFloat(latitudeValue) : null;
+            const longitude = longitudeValue ? parseFloat(longitudeValue) : null;
+            const safeLatitude = Number.isFinite(latitude) ? latitude : null;
+            const safeLongitude = Number.isFinite(longitude) ? longitude : null;
             
             if (!title || !author || !content) {
                 alert('Please fill in all required fields');
@@ -523,8 +607,10 @@
                             
                             if (uploadError) {
                                 console.error(`Error uploading file ${file.name}:`, uploadError);
+                                console.error('Upload error details:', JSON.stringify(uploadError, null, 2));
+                                
                                 // Check if it's a duplicate file error
-                                if (uploadError.message && uploadError.message.includes('already exists')) {
+                                if (uploadError.message && (uploadError.message.includes('already exists') || uploadError.message.includes('duplicate'))) {
                                     console.warn(`File ${fileName} already exists, trying alternative name`);
                                     // Try with a different name
                                     const altFileName = `${baseTimestamp}_${index}_alt_${Math.random().toString(36).substring(2, 9)}_${sanitizedName}`;
@@ -535,23 +621,74 @@
                                             upsert: false
                                         });
                                     
-                                    if (!altError) {
+                                    if (!altError && altData) {
+                                        const altFilePath = altData.path || altFileName;
                                         const { data: { publicUrl } } = supabase.storage
                                             .from('documents')
-                                            .getPublicUrl(altFileName);
+                                            .getPublicUrl(altFilePath);
                                         console.log(`Successfully uploaded ${file.name} with alternative name`);
+                                        console.log(`Alternative file path: ${altFilePath}`);
+                                        console.log(`Alternative public URL: ${publicUrl}`);
+                                        
+                                        // Verify the file actually exists in storage
+                                        const { data: verifyData, error: verifyError } = await supabase.storage
+                                            .from('documents')
+                                            .list(altFilePath.split('/')[0] || '', {
+                                                limit: 100,
+                                                search: altFilePath
+                                            });
+                                        
+                                        if (verifyError) {
+                                            console.warn('Could not verify file in storage:', verifyError);
+                                        } else {
+                                            console.log('File verified in storage:', verifyData);
+                                        }
+                                        
                                         return publicUrl;
+                                    } else {
+                                        console.error('Alternative upload also failed:', altError);
                                     }
                                 }
                                 return null;
                             }
                             
-                            // Get public URL
+                            if (!uploadData) {
+                                console.error('Upload succeeded but no data returned');
+                                return null;
+                            }
+                            
+                            // Get public URL - use the path from upload data
+                            const filePath = uploadData.path || fileName;
+                            console.log(`Upload data received:`, uploadData);
+                            console.log(`Using file path: ${filePath}`);
+                            
                             const { data: { publicUrl } } = supabase.storage
                                 .from('documents')
-                                .getPublicUrl(fileName);
+                                .getPublicUrl(filePath);
                             
-                            console.log(`Successfully uploaded ${file.name}: ${publicUrl}`);
+                            console.log(`Successfully uploaded ${file.name}`);
+                            console.log(`File path: ${filePath}`);
+                            console.log(`Public URL: ${publicUrl}`);
+                            
+                            // Verify the file actually exists in storage
+                            const pathParts = filePath.split('/');
+                            const folder = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : '';
+                            const { data: verifyList, error: verifyError } = await supabase.storage
+                                .from('documents')
+                                .list(folder, {
+                                    limit: 1000
+                                });
+                            
+                            if (verifyError) {
+                                console.warn('Could not verify file in storage:', verifyError);
+                            } else {
+                                const fileExists = verifyList?.some(f => f.name === pathParts[pathParts.length - 1]);
+                                console.log(`File verification: ${fileExists ? 'EXISTS' : 'NOT FOUND'} in storage`);
+                                if (!fileExists) {
+                                    console.error('WARNING: File uploaded but not found in storage list!');
+                                }
+                            }
+                            
                             return publicUrl;
                         } catch (err) {
                             console.error(`Exception uploading file ${file.name}:`, err);
@@ -575,19 +712,34 @@
                 }
                 
                 // Create document
-                console.log(`Creating document with ${photoUrls.length} photo(s)`);
-                console.log('Photo URLs:', photoUrls);
+                console.log(`=== Creating document with ${photoUrls.length} photo(s) ===`);
+                console.log('Photo URLs to save:', JSON.stringify(photoUrls, null, 2));
+                
+                // Verify photo URLs are valid
+                if (photoUrls.length > 0) {
+                    console.log('Verifying photo URLs...');
+                    photoUrls.forEach((url, idx) => {
+                        if (!url || url.trim() === '') {
+                            console.warn(`Photo URL ${idx + 1} is empty or invalid`);
+                        } else {
+                            console.log(`Photo URL ${idx + 1} is valid: ${url}`);
+                        }
+                    });
+                }
                 
                 const documentData = {
                     title,
                     author,
                     category,
                     content,
+                    location_name: locationNameValue || null,
+                    latitude: safeLatitude,
+                    longitude: safeLongitude,
                     photo_urls: photoUrls.length > 0 ? photoUrls : null,
                     created_at: new Date().toISOString()
                 };
                 
-                console.log('Document data to insert:', documentData);
+                console.log('Document data to insert:', JSON.stringify(documentData, null, 2));
                 
                 const { data: newDoc, error } = await supabase
                     .from('documents')
@@ -595,14 +747,32 @@
                     .select();
                 
                 if (error) {
-                    console.error('Error creating document:', error);
+                    console.error('=== Error creating document ===');
+                    console.error('Error:', error);
+                    console.error('Error details:', JSON.stringify(error, null, 2));
                     throw error;
                 }
                 
-                console.log('Document created successfully:', newDoc);
+                console.log('=== Document created successfully ===');
+                console.log('Created document:', JSON.stringify(newDoc, null, 2));
+                
                 if (newDoc && newDoc[0]) {
-                    console.log('Document photo_urls:', newDoc[0].photo_urls);
+                    console.log('Document ID:', newDoc[0].id);
+                    console.log('Document photo_urls:', JSON.stringify(newDoc[0].photo_urls, null, 2));
                     console.log('Photo URLs count:', newDoc[0].photo_urls ? newDoc[0].photo_urls.length : 0);
+                    
+                    // Verify the document was saved correctly
+                    const { data: verifyDoc, error: verifyError } = await supabase
+                        .from('documents')
+                        .select('*')
+                        .eq('id', newDoc[0].id)
+                        .single();
+                    
+                    if (verifyError) {
+                        console.error('Could not verify document:', verifyError);
+                    } else {
+                        console.log('Document verified in database:', JSON.stringify(verifyDoc, null, 2));
+                    }
                 }
                 
                 // Clear form
@@ -611,16 +781,19 @@
                 document.getElementById('docContent').value = '';
                 document.getElementById('docPhotos').value = '';
                 document.getElementById('selectedFilesCount').classList.add('hidden');
+                clearDocumentLocation();
                 
                 // Clear any active filters to ensure new document is visible
                 document.getElementById('searchInput').value = '';
                 document.getElementById('categoryFilter').value = '';
                 
-                // Reload documents immediately to show the new document
-                await loadDocuments();
-                
-                // Scroll to the document viewing area to show the new document
-                document.getElementById('documentsList').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Force reload documents immediately to show the new document
+                // Small delay to ensure database has updated
+                setTimeout(async () => {
+                    await loadDocuments();
+                    // Scroll to the document viewing area to show the new document
+                    document.getElementById('documentsList').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 500);
                 
                 alert('Document created successfully!');
             } catch (error) {
@@ -637,16 +810,25 @@
         // Load documents
         async function loadDocuments() {
             try {
+                console.log('Loading documents from Supabase...');
+                initializeMaps();
+                // Force fresh fetch by adding timestamp to prevent caching
                 const { data: documents, error } = await supabase
                     .from('documents')
                     .select('*')
                     .order('created_at', { ascending: false });
                 
-                if (error) throw error;
+                if (error) {
+                    console.error('Error fetching documents:', error);
+                    throw error;
+                }
                 
+                console.log(`Loaded ${documents?.length || 0} documents from Supabase`);
                 await displayDocuments(documents || []);
             } catch (error) {
                 console.error('Error loading documents:', error);
+                const container = document.getElementById('documentsList');
+                container.innerHTML = '<p class="text-red-500 text-center py-8">Error loading documents. Please refresh the page.</p>';
             }
         }
         
@@ -655,6 +837,8 @@
             const container = document.getElementById('documentsList');
             
             if (documents.length === 0) {
+                allDocuments = [];
+                updateDocumentMap([]);
                 container.innerHTML = '<p class="text-gray-500 text-center py-8">No documents found. Create your first document above!</p>';
                 return;
             }
@@ -664,6 +848,9 @@
                 const avgRating = await getAverageRating(doc.id);
                 return { ...doc, avgRating };
             }));
+            
+            allDocuments = documentsWithRatings;
+            updateDocumentMap(documentsWithRatings);
             
             container.innerHTML = documentsWithRatings.map(doc => {
                 // Handle photo_urls - it might be a string, array, or null
@@ -684,6 +871,9 @@
                 }
                 const hasPhotos = photoUrls.length > 0;
                 const photoCount = photoUrls.length;
+                const latitudeValue = (doc.latitude !== undefined && doc.latitude !== null) ? Number(doc.latitude) : null;
+                const longitudeValue = (doc.longitude !== undefined && doc.longitude !== null) ? Number(doc.longitude) : null;
+                const hasValidCoordinates = Number.isFinite(latitudeValue) && Number.isFinite(longitudeValue);
                 return `
                 <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition cursor-pointer" onclick="viewDocument('${doc.id}')">
                     <div class="flex justify-between items-start mb-2">
@@ -707,7 +897,17 @@
                             </span>
                         </div>
                     </div>
-                    <p class="text-sm text-gray-600 mb-2">By ${escapeHtml(doc.author)}</p>
+                    <p class="text-sm text-gray-600 mb-1">By ${escapeHtml(doc.author)}</p>
+                    ${(doc.location_name || hasValidCoordinates) ? `
+                        <p class="text-xs text-green-600 mb-2 flex items-center space-x-2">
+                            <span class="flex items-center"><i class="fas fa-map-marker-alt mr-1"></i>${escapeHtml(doc.location_name || 'Pinned Location')}</span>
+                            ${hasValidCoordinates ? `
+                                <span class="text-[10px] text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                                    ${latitudeValue.toFixed(2)}, ${longitudeValue.toFixed(2)}
+                                </span>
+                            ` : ''}
+                        </p>
+                    ` : ''}
                     <p class="text-gray-700">${escapeHtml(doc.content.substring(0, 150))}${doc.content.length > 150 ? '...' : ''}</p>
                     <p class="text-xs text-gray-500 mt-2">${new Date(doc.created_at).toLocaleDateString()}</p>
                 </div>
@@ -734,6 +934,15 @@
                 
                 card.style.display = (matchesSearch && matchesCategory) ? 'block' : 'none';
             }
+
+            const filteredDocs = allDocuments.filter(doc => {
+                const combinedText = `${doc.title || ''} ${doc.author || ''} ${doc.content || ''} ${doc.category || ''}`.toLowerCase();
+                const matchesSearch = !searchTerm || combinedText.includes(searchTerm);
+                const matchesCategory = !categoryFilter || (doc.category || '').toLowerCase() === categoryFilter;
+                return matchesSearch && matchesCategory;
+            });
+
+            updateDocumentMap(filteredDocs);
         }
         
         // View document details
@@ -785,15 +994,24 @@
                 }
                 
                 console.log('Processed photo URLs for display:', photoUrls);
+                const latitudeValue = (doc.latitude !== undefined && doc.latitude !== null) ? Number(doc.latitude) : null;
+                const longitudeValue = (doc.longitude !== undefined && doc.longitude !== null) ? Number(doc.longitude) : null;
+                const hasValidCoordinates = Number.isFinite(latitudeValue) && Number.isFinite(longitudeValue);
                 
                 contentDiv.innerHTML = `
                     <div class="space-y-6">
-                        <div class="flex items-center space-x-4 text-gray-600">
-                            <span><i class="fas fa-user mr-2"></i>${escapeHtml(doc.author)}</span>
-                            <span><i class="fas fa-calendar mr-2"></i>${new Date(doc.created_at).toLocaleDateString()}</span>
+                        <div class="flex items-center flex-wrap gap-2 text-gray-600">
+                            <span class="flex items-center"><i class="fas fa-user mr-2"></i>${escapeHtml(doc.author)}</span>
+                            <span class="flex items-center"><i class="fas fa-calendar mr-2"></i>${new Date(doc.created_at).toLocaleDateString()}</span>
                             <span class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm">
                                 ${doc.category}
                             </span>
+                            ${(doc.location_name || hasValidCoordinates) ? `
+                                <span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm flex items-center space-x-2">
+                                    <span class="flex items-center"><i class="fas fa-map-marker-alt mr-1"></i>${escapeHtml(doc.location_name || 'Pinned Location')}</span>
+                                    ${hasValidCoordinates ? `<span class="font-mono text-[11px] text-green-700">${latitudeValue.toFixed(2)}, ${longitudeValue.toFixed(2)}</span>` : ''}
+                                </span>
+                            ` : ''}
                             ${photoUrls.length > 0 ? `
                                 <span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
                                     <i class="fas fa-image mr-1"></i>${photoUrls.length} photo(s)
@@ -809,11 +1027,14 @@
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     ${photoUrls.map((url, index) => {
                                         if (!url) return '';
+                                        // Add cache-busting parameter to ensure fresh image load
+                                        const imageUrl = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
                                         return `
                                         <div class="relative">
-                                            <img src="${url}" alt="Document photo ${index + 1}" 
+                                            <img src="${imageUrl}" alt="Document photo ${index + 1}" 
                                                  class="rounded-lg shadow-md w-full h-auto cursor-pointer hover:shadow-lg transition"
-                                                 onerror="console.error('Failed to load image:', '${url}'); this.style.display='none';"
+                                                 loading="lazy"
+                                                 onerror="console.error('Failed to load image:', '${url}'); this.parentElement.innerHTML='<p class=\\'text-red-500 text-sm\\'>Failed to load image</p>';"
                                                  onclick="window.open('${url}', '_blank')">
                                         </div>
                                     `;
@@ -988,7 +1209,8 @@
                 console.error('Error loading settings:', error);
             }
             
-            // Load users
+            // Always reload users fresh from Supabase when opening admin panel
+            console.log('Opening admin panel - reloading users...');
             await loadUsers();
             
             document.getElementById('adminModal').classList.remove('hidden');
@@ -1064,32 +1286,59 @@
             }
         }
         
-        // Load users
+        // Load users - ALWAYS fresh from Supabase
         async function loadUsers() {
             try {
+                console.log('=== Loading users from Supabase ===');
+                console.log('Current timestamp:', new Date().toISOString());
+                
+                // Force fresh query - clear any potential cache
                 const { data: users, error } = await supabase
                     .from('users')
                     .select('*')
                     .order('created_at', { ascending: false });
                 
-                if (error) throw error;
+                if (error) {
+                    console.error('Error fetching users:', error);
+                    console.error('Error details:', JSON.stringify(error, null, 2));
+                    throw error;
+                }
+                
+                console.log(`=== Loaded ${users?.length || 0} users from Supabase ===`);
+                console.log('Users data:', JSON.stringify(users, null, 2));
                 
                 const usersList = document.getElementById('usersList');
-                usersList.innerHTML = (users || []).map(user => `
+                
+                if (!users || users.length === 0) {
+                    usersList.innerHTML = '<p class="text-gray-500 text-center py-4">No users found in Supabase.</p>';
+                    return;
+                }
+                
+                // Clear any cached data and display fresh users
+                usersList.innerHTML = users.map(user => {
+                    console.log(`Displaying user: ${user.username} (ID: ${user.id})`);
+                    return `
                     <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                         <div>
                             <span class="font-semibold">${escapeHtml(user.username)}</span>
                             <span class="ml-2 px-2 py-1 text-xs rounded ${user.access_level === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">
                                 ${user.access_level}
                             </span>
+                            <span class="ml-2 text-xs text-gray-400">ID: ${user.id.substring(0, 8)}...</span>
                         </div>
                         <button onclick="deleteUser('${user.id}')" class="text-red-600 hover:text-red-800">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
-                `).join('');
+                `;
+                }).join('');
+                
+                console.log('=== Users displayed successfully ===');
             } catch (error) {
-                console.error('Error loading users:', error);
+                console.error('=== Error loading users ===');
+                console.error('Error:', error);
+                const usersList = document.getElementById('usersList');
+                usersList.innerHTML = `<p class="text-red-500 text-center py-4">Error loading users: ${error.message || 'Unknown error'}</p>`;
             }
         }
         
@@ -1155,6 +1404,180 @@
             div.textContent = text;
             return div.innerHTML;
         }
+
+        function initializeMaps(retryCount = 0) {
+            if (typeof L === 'undefined') {
+                if (retryCount < 10) {
+                    console.warn('Leaflet library not ready yet. Retrying...');
+                    setTimeout(() => initializeMaps(retryCount + 1), 300);
+                } else {
+                    console.error('Leaflet library failed to load. Maps will be unavailable.');
+                }
+                return;
+            }
+
+            if (mapsInitialized) {
+                refreshMaps();
+                return;
+            }
+
+            const documentMapElement = document.getElementById('documentsMap');
+            const locationPickerElement = document.getElementById('documentLocationPicker');
+
+            if (!documentMapElement || !locationPickerElement) {
+                if (retryCount < 10) {
+                    setTimeout(() => initializeMaps(retryCount + 1), 300);
+                } else {
+                    console.warn('Map containers not found in DOM. Maps will be skipped.');
+                }
+                return;
+            }
+
+            documentMap = L.map('documentsMap', {
+                center: [20, 0],
+                zoom: 2,
+                scrollWheelZoom: true
+            });
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(documentMap);
+
+            creationMap = L.map('documentLocationPicker', {
+                center: [20, 0],
+                zoom: 2,
+                scrollWheelZoom: true
+            });
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(creationMap);
+
+            creationMap.on('click', (event) => {
+                setDocumentLocation(event.latlng);
+            });
+
+            mapsInitialized = true;
+            refreshMaps();
+            updateDocumentMap(allDocuments);
+        }
+
+        function refreshMaps() {
+            setTimeout(() => {
+                if (creationMap) {
+                    creationMap.invalidateSize();
+                }
+                if (documentMap) {
+                    documentMap.invalidateSize();
+                }
+            }, 250);
+        }
+
+        function setDocumentLocation(latlng, options = {}) {
+            if (!creationMap || !latlng) return;
+
+            const { lat, lng } = latlng;
+
+            if (!creationMarker) {
+                creationMarker = L.marker(latlng, { draggable: true }).addTo(creationMap);
+                creationMarker.on('dragend', (event) => {
+                    const updatedLatLng = event.target.getLatLng();
+                    setDocumentLocation(updatedLatLng, { fromDrag: true });
+                });
+            } else {
+                creationMarker.setLatLng(latlng);
+            }
+
+            if (!options.fromDrag) {
+                creationMap.panTo(latlng);
+            }
+
+            selectedLocation = latlng;
+
+            const latInput = document.getElementById('docLatitude');
+            const lngInput = document.getElementById('docLongitude');
+            const statusEl = document.getElementById('docLocationStatus');
+
+            if (latInput) latInput.value = lat.toFixed(6);
+            if (lngInput) lngInput.value = lng.toFixed(6);
+            if (statusEl) statusEl.textContent = `Location selected: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            refreshMaps();
+        }
+
+        function clearDocumentLocation(message = 'No location selected.') {
+            if (creationMarker && creationMap) {
+                creationMap.removeLayer(creationMarker);
+                creationMarker = null;
+            }
+            selectedLocation = null;
+
+            const latInput = document.getElementById('docLatitude');
+            const lngInput = document.getElementById('docLongitude');
+            const nameInput = document.getElementById('docLocationName');
+            const statusEl = document.getElementById('docLocationStatus');
+
+            if (latInput) latInput.value = '';
+            if (lngInput) lngInput.value = '';
+            if (nameInput) nameInput.value = '';
+            if (statusEl) statusEl.textContent = message;
+            refreshMaps();
+        }
+
+        function refreshDocumentMap() {
+            if (!mapsInitialized) {
+                initializeMaps();
+            }
+            updateDocumentMap(allDocuments);
+        }
+
+        function updateDocumentMap(documents = []) {
+            if (!mapsInitialized) {
+                initializeMaps();
+            }
+            if (!documentMap || typeof L === 'undefined') {
+                return;
+            }
+
+            documentMarkers.forEach(marker => marker.remove());
+            documentMarkers = [];
+
+            const markerLocations = [];
+
+            documents.forEach(doc => {
+                const lat = doc.latitude !== undefined && doc.latitude !== null ? Number(doc.latitude) : null;
+                const lng = doc.longitude !== undefined && doc.longitude !== null ? Number(doc.longitude) : null;
+
+                if (lat === null || lng === null || Number.isNaN(lat) || Number.isNaN(lng)) {
+                    return;
+                }
+
+                const marker = L.marker([lat, lng], { title: doc.title || 'Document' });
+                marker.on('click', () => viewDocument(doc.id));
+
+                marker.bindTooltip(escapeHtml(doc.title || 'Document'), {
+                    direction: 'top',
+                    offset: [0, -10],
+                    opacity: 0.9
+                });
+
+                marker.addTo(documentMap);
+                documentMarkers.push(marker);
+                markerLocations.push([lat, lng]);
+            });
+
+            if (markerLocations.length > 1) {
+                const bounds = L.latLngBounds(markerLocations).pad(0.25);
+                documentMap.fitBounds(bounds, { animate: true });
+            } else if (markerLocations.length === 1) {
+                documentMap.setView(markerLocations[0], 10);
+            } else {
+                documentMap.setView([20, 0], 2);
+            }
+
+            refreshMaps();
+        }
         
         // Initialize app
         window.addEventListener('DOMContentLoaded', async () => {
@@ -1169,7 +1592,10 @@
                     document.getElementById('adminBtn').classList.remove('hidden');
                 }
                 
-                loadDocuments();
+                initializeMaps();
+
+                // Always load fresh documents on page load
+                await loadDocuments();
             }
             
             // Check if first time user
@@ -1195,8 +1621,28 @@
                     }
                 });
             }
+            
+            const clearLocationBtn = document.getElementById('docLocationClearBtn');
+            if (clearLocationBtn) {
+                clearLocationBtn.addEventListener('click', () => {
+                    clearDocumentLocation();
+                });
+            }
+            
+            // Reload documents when page becomes visible (user switches tabs back)
+            document.addEventListener('visibilitychange', async () => {
+                if (!document.hidden && currentUser) {
+                    console.log('Page became visible, reloading documents...');
+                    await loadDocuments();
+                }
+            });
+        });
+        
+        window.addEventListener('load', () => {
+            initializeMaps();
         });
     </script>
 </body>
 </html>
+
 

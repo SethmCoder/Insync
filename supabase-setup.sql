@@ -24,6 +24,9 @@ CREATE TABLE documents (
   author TEXT NOT NULL,
   content TEXT NOT NULL,
   category TEXT NOT NULL,
+  location_name TEXT,
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
   photo_urls TEXT[],
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -90,14 +93,14 @@ INSERT INTO app_settings (user_password, admin_password, version) VALUES
   ('insync2024', 'insync2024', 'v2.00');
 
 -- Create sample documents
-INSERT INTO documents (title, author, content, category) VALUES
-  ('Welcome to Insync!', 'Admin', 'This is your personal space to share updates, travel stories, and collaborate on documents with friends. Start by creating your first document or browse what others have shared!', 'update'),
-  ('Summer Travel Plans', 'Admin', 'Planning a trip to Europe this summer. Looking for recommendations on must-visit places in Paris and Rome. Any suggestions would be appreciated!', 'travel'),
-  ('Project Collaboration Guidelines', 'Admin', 'Here are some guidelines for our collaborative documents: 1) Be respectful in comments, 2) Use constructive feedback, 3) Rate honestly, 4) Share your thoughts freely!', 'document'),
-  ('Weekend Hiking Event', 'Admin', 'Join us this Saturday for a morning hike at the local nature reserve! We''ll meet at the parking lot at 8 AM. Bring water, snacks, and good hiking shoes. See you there!', 'event'),
-  ('Book Review: "The Alchemist"', 'Admin', 'Just finished reading this amazing book. The journey of Santiago really resonated with me. The themes of following your dreams and listening to your heart are beautifully woven throughout the story. Highly recommend!', 'article'),
-  ('Recipe: Homemade Pizza', 'Admin', 'Here''s my secret recipe for the perfect homemade pizza: Start with a good dough (let it rise overnight), use fresh mozzarella, and don''t skimp on the sauce. Bake at 450°F for 12-15 minutes. Delicious!', 'article'),
-  ('Team Meeting Notes', 'Admin', 'Key points from today''s meeting: 1) New features planned for next month, 2) Everyone should review the design mockups, 3) Next meeting scheduled for Friday at 2 PM. Please confirm your attendance.', 'update');
+INSERT INTO documents (title, author, content, category, location_name, latitude, longitude) VALUES
+  ('Welcome to Insync!', 'Admin', 'This is your personal space to share updates, travel stories, and collaborate on documents with friends. Start by creating your first document or browse what others have shared!', 'update', NULL, NULL, NULL),
+  ('Summer Travel Plans', 'Admin', 'Planning a trip to Europe this summer. Looking for recommendations on must-visit places in Paris and Rome. Any suggestions would be appreciated!', 'travel', NULL, NULL, NULL),
+  ('Project Collaboration Guidelines', 'Admin', 'Here are some guidelines for our collaborative documents: 1) Be respectful in comments, 2) Use constructive feedback, 3) Rate honestly, 4) Share your thoughts freely!', 'document', NULL, NULL, NULL),
+  ('Weekend Hiking Event', 'Admin', 'Join us this Saturday for a morning hike at the local nature reserve! We''ll meet at the parking lot at 8 AM. Bring water, snacks, and good hiking shoes. See you there!', 'event', NULL, NULL, NULL),
+  ('Book Review: \"The Alchemist\"', 'Admin', 'Just finished reading this amazing book. The journey of Santiago really resonated with me. The themes of following your dreams and listening to your heart are beautifully woven throughout the story. Highly recommend!', 'article', NULL, NULL, NULL),
+  ('Recipe: Homemade Pizza', 'Admin', 'Here''s my secret recipe for the perfect homemade pizza: Start with a good dough (let it rise overnight), use fresh mozzarella, and don''t skimp on the sauce. Bake at 450°F for 12-15 minutes. Delicious!', 'article', NULL, NULL, NULL),
+  ('Team Meeting Notes', 'Admin', 'Key points from today''s meeting: 1) New features planned for next month, 2) Everyone should review the design mockups, 3) Next meeting scheduled for Friday at 2 PM. Please confirm your attendance.', 'update', NULL, NULL, NULL);
 
 -- Create indexes for better performance
 CREATE INDEX idx_documents_category ON documents(category);
