@@ -150,7 +150,10 @@
 
                     <div class="space-y-3">
                         <label class="block text-sm font-medium text-gray-700">Location (Optional)</label>
-                        <p class="map-instruction">Click anywhere on the map to drop a document pin, or enter coordinates manually. Leave blank to skip.</p>
+                        <div class="space-y-1">
+                            <p class="map-instruction">Click anywhere on the map to drop a document pin, or enter coordinates manually. Leave blank to skip.</p>
+                            <p class="map-instruction text-[11px]">Need coordinates? Right-click a spot in Google Maps, copy the latitude/longitude that appear, then paste them below.</p>
+                        </div>
                         <input type="text" id="docLocationName" placeholder="Enter location name or description"
                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
                         <div class="map-container border border-gray-200">
@@ -234,7 +237,10 @@
                         <span>Reset View</span>
                     </button>
                 </div>
-                <p class="map-instruction mb-3">Documents with saved locations appear on the map below. Click a pin to open the document. Use two fingers or your mouse to zoom and pan.</p>
+                <div class="space-y-2 mb-3">
+                    <p class="map-instruction">Documents with saved locations appear on the map below. Click a pin to open the document. Use two fingers or your mouse to zoom and pan.</p>
+                    <p class="map-instruction text-[11px]">To access coordinates, right-click on the place you want in Google Maps, copy the latitude/longitude that appear, and paste them into the coordinate fields when creating a document.</p>
+                </div>
                 <div class="map-container border border-gray-200">
                     <div id="documentsMap"></div>
                 </div>
